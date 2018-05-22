@@ -23,7 +23,7 @@ def running(server_socket):
     while True:
         # Wait for client connections
         client_connection, client_address = server_socket.accept()
-        print("Nova conexão ->", client_address)
+        print("Nova requisição ->", client_address)
         worker = Worker(client_connection, client_address)
         worker.start()
 

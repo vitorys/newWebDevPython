@@ -20,8 +20,14 @@ class Worker(Thread):
     def run(self):
         requestHeader = self.parseHeader()
 
-        response = self.buildResponse(requestHeader)
-        self.client_connection.sendall(response.encode())
+        # Buid response header
+        pathExist, headerResponse = self.buildHeaderResponse(requestHeader.path)
+        self.client_connection.sendall(headerResponse.encode())
+
+        # Build file content
+        response = self.buildResponse(pathExist, requestHeader)
+        if response is not None:
+            self.client_connection.sendall(response.encode())
 
         self.client_connection.close()
 
@@ -44,31 +50,23 @@ class Worker(Thread):
 
         return requestHeader
 
-    def buildResponse(self, requestHeader):
+    def buildResponse(self, pathExists, requestHeader):
 
-        # Buid response header
-        pathExist, headerResponse = self.buildHeaderResponse(requestHeader.path)
-
-        if pathExist:
+        if pathExists:
             # Deve verificar se o caminho é diretório ou arquivo
             if os.path.isfile(requestHeader.path):
                 # Se for arquivo
-                contentOfPath = self.showFileContent(requestHeader.path)
+                self.showFileContent(requestHeader.path)
             else:
                 # Se for diretório
                 contentOfPath = self.showDirContent(requestHeader.path)
-                print(contentOfPath)
-
-
 
         else:
-            # 404 NOT FOUND
-            response = headerResponse
-            return response
+            return None
 
         # Build content of response
 
-        return headerResponse + contentOfPath
+        return contentOfPath
 
     def buildHeaderResponse(self, path):
         # Build Response Header
@@ -77,25 +75,31 @@ class Worker(Thread):
         else:
             response = response404
             # Retorna flag falando que arquivo não existe e erro 404
+            self.client_connection.sendall(response.encode())
             return False, response
-
+        self.client_connection.sendall(response.encode())
         # Retorna flag falando que arquivo existe e código 200
         return True, response
 
-    def showFileContent(self, path):
-        # file = open(path, "rb")
-        # bytesSequence = file.read(size)        	# read only 512 bytes in each loop
+    def showFileContent(self, path, size=512):
+        file = open(path, "rb")
+        bytesSequence = file.read()        	# read only 512 bytes in each loop
 
-        # while(bytes.__len__(bytesSequence)):
-        #    self.send(bytesSequence)	        # send the 512 bytes
-        #    bytesSequence = file.read(size)    	# get nexts 512 bytes
-        pass
+        while(bytes.__len__(bytesSequence)):
+            self.client_connection.sendall(bytesSequence)	        # send the 512 bytes
+            bytesSequence = file.read(size)    	# get nexts 512 bytes
+
 
     def showDirContent(self, path):
         files = os.listdir(path)
         response = "\r\n\r\n" + tableHeader
         for file in files:
             response += "\n<tr>"
-            response += "<th>"+ file +"<\th>"
-            response += "<th>to be done<\th>"
-            response += "<th>To be done<\th>"
+            print("<th><a href=\"/" + file + "\">" + file +"</th>")
+            response += "<th><a href=\"" + file + "\">" + file +"</th>"
+            response += "<th>to be done</th>"
+            response += "<th>To be done</th>"
+            response += "\</tr>"
+
+        response = response + tableTail
+        return response

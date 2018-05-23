@@ -2,10 +2,13 @@
 # -*- coding: utf-8 -*-
 
 import os
+from Utils import *
 from threading import Thread
 from Header import Header
 from Constant import *
 import os
+import os.path, time
+
 
 class Worker(Thread):
     """docstring for Worker"""
@@ -25,9 +28,7 @@ class Worker(Thread):
         self.client_connection.sendall(headerResponse.encode())
 
         # Build file content
-        response = self.buildResponse(pathExist, requestHeader)
-        if response is not None:
-            self.client_connection.sendall(response.encode())
+        self.buildResponse(pathExist, requestHeader)
 
         self.client_connection.close()
 
@@ -59,14 +60,11 @@ class Worker(Thread):
                 self.showFileContent(requestHeader.path)
             else:
                 # Se for diretório
-                contentOfPath = self.showDirContent(requestHeader.path)
+                self.showDirContent(requestHeader.path)
 
         else:
             return None
 
-        # Build content of response
-
-        return contentOfPath
 
     def buildHeaderResponse(self, path):
         # Build Response Header
@@ -77,6 +75,7 @@ class Worker(Thread):
             # Retorna flag falando que arquivo não existe e erro 404
             self.client_connection.sendall(response.encode())
             return False, response
+
         self.client_connection.sendall(response.encode())
         # Retorna flag falando que arquivo existe e código 200
         return True, response
@@ -93,13 +92,17 @@ class Worker(Thread):
     def showDirContent(self, path):
         files = os.listdir(path)
         response = "\r\n\r\n" + tableHeader
+
         for file in files:
+            file = file.decode('utf-8')
             response += "\n<tr>"
-            print("<th><a href=\"/" + file + "\">" + file +"</th>")
-            response += "<th><a href=\"" + file + "\">" + file +"</th>"
-            response += "<th>to be done</th>"
-            response += "<th>To be done</th>"
-            response += "\</tr>"
+
+            response += "<th><a href=\"" + path + "/" + file + "\">"+file+"</th>\n"
+            print(response)
+            response += "<th>"+ time.ctime(os.path.getmtime(path+file)) +"</th>\n"
+            response += "<th>"+ convertBytes(os.stat(path+file).st_mode) +"</th>"
+            response += "</tr>"
 
         response = response + tableTail
-        return response
+
+        self.client_connection.sendall(response.encode())

@@ -8,7 +8,8 @@ from Header import Header
 from Constant import *
 import os
 import os.path, time
-
+from mimetypes import MimeTypes
+import urllib
 
 class Worker(Thread):
     """docstring for Worker"""
@@ -23,7 +24,7 @@ class Worker(Thread):
     def run(self):
         requestHeader = self.parseHeader()
 
-        # Buid response header
+        # Build response header
         pathExist, headerResponse = self.buildHeaderResponse(requestHeader.path)
         self.client_connection.sendall(headerResponse.encode())
 
@@ -42,9 +43,9 @@ class Worker(Thread):
         cookie = None
 
         for line in header:
-            if ("Host" in line):
+            if "Host" in line:
                 host = line.split(" ")[1]
-            if ("Cookie" in line):
+            if "Cookie" in line:
                 cookie = line.split(" ")[1]
 
         requestHeader = Header(method, path, host, cookie)
@@ -65,7 +66,6 @@ class Worker(Thread):
         else:
             return None
 
-
     def buildHeaderResponse(self, path):
         # Build Response Header
         if os.path.exists(path):
@@ -81,26 +81,31 @@ class Worker(Thread):
         return True, response
 
     def showFileContent(self, path, size=512):
+        mime = MimeTypes()
+        mime_type = mime.guess_type(path)
+        contentType = 'Content-Type: ' + mime_type[0] + '\r\n\r\n'
+        self.client_connection.sendall(contentType.encode())
+
         file = open(path, "rb")
-        bytesSequence = file.read()        	# read only 512 bytes in each loop
+        bytesSequence = file.read()  # read only 512 bytes in each loop
 
-        while(bytes.__len__(bytesSequence)):
-            self.client_connection.sendall(bytesSequence)	        # send the 512 bytes
-            bytesSequence = file.read(size)    	# get nexts 512 bytes
-
+        while bytes.__len__(bytesSequence):
+            self.client_connection.sendall(bytesSequence)  # send the 512 bytes
+            bytesSequence = file.read(size)  # get nexts 512 bytes
 
     def showDirContent(self, path):
+        if  path[-1:] != '/':
+            path += '/'
+
         files = os.listdir(path)
         response = "\r\n\r\n" + tableHeader
 
         for file in files:
-            file = file.decode('utf-8')
             response += "\n<tr>"
 
-            response += "<th><a href=\"" + path + "/" + file + "\">"+file+"</th>\n"
-            print(response)
-            response += "<th>"+ time.ctime(os.path.getmtime(path+file)) +"</th>\n"
-            response += "<th>"+ convertBytes(os.stat(path+file).st_mode) +"</th>"
+            response += "<th><a href=\"" + path + file + "\">" + file + "</th>\n"
+            response += "<th>" + time.ctime(os.path.getmtime(path + file)) + "</th>\n"
+            response += "<th>" + convertBytes(os.stat(path + file).st_mode) + "</th>"
             response += "</tr>"
 
         response = response + tableTail
